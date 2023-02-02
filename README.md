@@ -1,6 +1,6 @@
 # ESP-PHONE
 
-A mobile phone built with the ESP32 (SEEED XIAO ESP32).
+A mobile phone with incoming and outgoing phone call suport and simple POS payment machine built with the ESP32 (SEEED XIAO ESP32).
 
 # Current features
 1. 4G/LTE and 2G/GSM connectivity.
