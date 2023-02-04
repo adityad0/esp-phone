@@ -1,6 +1,6 @@
-# ESP-PHONE
+# PAY-PHONE
 
-A mobile phone with incoming and outgoing phone call suport and simple POS payment machine built with the ESP32 (SEEED XIAO ESP32).
+The pay-phone is a project which combines two devices, a POS machine and a mobile phone and is built with the SEEED XIAO nRF52840 BLE. The program is written in micropython, an efficient version of Python for microcontrollers and embedded devices. This project is currently under development and may contain several bugs and issues and can be recreated only at the users risk.
 
 # Current features
 1. 4G/LTE and 2G/GSM connectivity.
@@ -21,3 +21,12 @@ A mobile phone with incoming and outgoing phone call suport and simple POS payme
 6. SSD1306 OLED Display (I2C or SPI).
 7. 4x4 matrix membrane keypad or another type.
 8. PCF8574T Based I2C converter for the keypad.
+
+
+# Getting started
+
+## Installing Micropython
+
+## Downloading the editor (Thonny)
+
+## Making the connections
