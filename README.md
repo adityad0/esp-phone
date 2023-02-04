@@ -26,7 +26,21 @@ The pay-phone is a project which combines two devices, a POS machine and a mobil
 # Getting started
 
 ## Installing Micropython
+1. Download Micropython for the SEEED BLE here: https://micropython.org/download/seeed_xiao_nrf52/ if you're using another microcontroller, download Micropython for your board here: https://micropython.org/download/
+2. 
 
 ## Downloading the editor (Thonny)
 
+## Downloading and installing modules
+
 ## Making the connections
+
+
+# Known issues
+
+
+# Credits, sources and other documentation
+
+uQR library: https://github.com/JASchilz/uQR
+
+SEEED Documentation: https://wiki.seeedstudio.com/XIAO_BLE/
