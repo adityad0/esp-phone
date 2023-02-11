@@ -215,7 +215,7 @@ void make_call() {
   if(call_keypad_handler_ret == 'D') {
     Serial.print("Dialing: ");
     Serial.println(call_phone_number);
-    send_at_command("ATD9538271867;", gsm_resp);
+    send_at_command("ATD+12065551234;", gsm_resp);
     Serial.println(gsm_resp);
     display.clear();
     display.drawString(0, 0, "Dialing:");
