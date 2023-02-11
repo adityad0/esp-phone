@@ -2,7 +2,7 @@
   * AUTHOR: @adityad0 [https://github.com/adityad0/]
   * PAY-PHONE https://github.com/adityad0/pay-phone/
   * LICENSE: https://github.com/adityad0/pay-phone/LICENSE.md
-  * A POS payment system built with the ESP32 with support for NFC, QR, Bluetooth and phone call support.
+  * A home made POS payment system and mobile phone built with the SEED XIAO ESP32-C3 with support for BLE, Wi-Fi and 4G/LTE support.
 */
 #include <Wire.h>
 #include "SSD1306Wire.h"
@@ -16,7 +16,7 @@
 #define GSM_BAUD 9600
 char gsm_resp[100] = "";
 char gsm_operator[100] = "Unknown";
-float net_strength = 0.00;
+char net_strength[100] = "0.00";
 char call_phone_number[100] = "";
 
 // OLED Initialization
@@ -73,13 +73,15 @@ void setup() {
   delay(1000);
 
   // Get the GSM operator and network strength
-  String net_operator;
-  net_operator = get_gsm_operator();
-  char net_strength = get_net_strength();
+  get_gsm_operator();
+  get_net_strength();
+
+  Serial.print("Parsed GSM operator: ");
+  Serial.println(gsm_operator);
 
   // Display the operator
   display.clear();
-  display.drawString(0, 0, net_operator);
+  display.drawString(0, 0, gsm_operator);
   display_menu();
 }
 
@@ -167,14 +169,31 @@ int send_at_command(const char* cmd, char* gsm_resp) {
   return ptr - gsm_resp;
 }
 
-char get_gsm_operator() {
+int get_gsm_operator() {
   reset_array(gsm_resp);
   int at_resp_len = send_at_command("AT+COPS=3,0", gsm_resp);
   reset_array(gsm_resp);
+  reset_array(gsm_operator);
   at_resp_len = send_at_command("AT+COPS?", gsm_resp);
   Serial.print("Network operator: ");
   Serial.println(gsm_resp);
-  return *gsm_resp;
+  strcpy(gsm_operator, gsm_resp);
+
+  // Parse the string to extract the operator
+  char* ptr1 = strstr(gsm_operator, "\"");
+  char mob_op[50] = {0,};
+  if(ptr1 != NULL) {
+    ptr1 += 1;
+    char* ptr2 = strstr(ptr1, "\"");
+    if(ptr2 != NULL) {
+      strncpy(mob_op, ptr1, ptr2 - ptr1);
+      strcpy(gsm_operator, mob_op);
+    }
+  }
+  if(sizeof(gsm_operator) == 0) {
+    strcpy(gsm_operator, "Unknown");
+  }
+  return sizeof(gsm_operator);
 }
 
 char get_net_strength() {
@@ -182,7 +201,9 @@ char get_net_strength() {
   int at_resp_len = send_at_command("AT+CSQ", gsm_resp);
   Serial.print("Network strength: ");
   Serial.println(gsm_resp);
-  return *gsm_resp;
+  reset_array(net_strength);
+  strcpy(net_strength, gsm_resp);
+  return sizeof(net_strength);
 }
 
 void make_call() {
