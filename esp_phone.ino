@@ -15,8 +15,8 @@
 #define SERIAL_BAUD 115200
 #define GSM_BAUD 9600
 char gsm_resp[100] = "";
-char gsm_operator[100] = "Unknown";
-char net_strength[100] = "0.00";
+char gsm_operator[50] = "Unknown";
+char net_strength[20] = "0.00";
 char call_phone_number[100] = "";
 
 // OLED Initialization
@@ -45,6 +45,10 @@ void setup() {
   // Setup serial
   Serial.begin(115200);
   Serial.println("Serial initialized.");
+
+  // Use core 1 for display, user interface and keypad
+  Serial.print("Running on core: ");
+  Serial.println(xPortGetCoreID());
 
   // Setup display
   display.init();
@@ -79,9 +83,20 @@ void setup() {
   Serial.print("Parsed GSM operator: ");
   Serial.println(gsm_operator);
 
-  // Display the operator
+  // Use core 0 to keep checking for incoming calls and SMS
+  // Create a new task on core for handling incoming calls and SMS
+  xTaskCreatePinnedToCore(
+    handle_incoming_calls,   // Function that should be called
+    "handle_incoming_calls", // Name of the task (for debugging)
+    10000,                   // Stack size (bytes)
+    NULL,                    // Input parameter to pass
+    1,                       // Task priority
+    NULL,                    // Task handle
+    0                        // Core where the task should run
+  );
+
+  // Call the main menu function
   display.clear();
-  display.drawString(0, 0, gsm_operator);
   display_menu();
 }
 
@@ -93,6 +108,65 @@ void loop () {
     display.clear();
     display.drawString(0, 0, &key);
     display.display();
+  }
+}
+
+// Function that runs on core 0 to handle incoming calls and SMS
+void handle_incoming_calls(void *parameter) {
+  Serial.print("handle_incoming_calls task started on core: ");
+  Serial.println(xPortGetCoreID());
+  while(1) {
+    if(gsm.available()) {
+      char c = gsm.read();
+      Serial.print(c);
+      if(c == '\n') {
+        Serial.println("New line detected from GSM.");
+        if(strstr(gsm_resp, "RING") != NULL) {
+          Serial.println("Incoming call detected.");
+          display.clear();
+          display.drawString(0, 0, "Incoming call");
+          display.drawString(0, 10, "CXL: Reject");
+          display.drawString(0, 20, "ACP: Answer");
+          display.display();
+          while(1) {
+            char key = keypad.getKey();
+            if(key == 'A') {
+              Serial.println("Call rejected.");
+              gsm.println("ATH;");
+              display.clear();
+              display.drawString(0, 0, "Call rejected.");
+              display.drawString(0, 10, "Press any key for menu.");
+              display.display();
+              delay(2000);
+              break;
+            } else if(key == 'D') {
+              gsm.println("ATA;");
+              Serial.println("Call accepted.");
+              display.clear();
+              display.drawString(0, 0, "Ongoing call..");
+              display.drawString(0, 10, "CXL: End call");
+              display.display();
+              while(1) {
+                char key = keypad.getKey();
+                if(key == 'A') {
+                  gsm.println("ATH;");
+                  Serial.println("Incoming call Ended.");
+                  display.clear();
+                  display.drawString(0, 0, "Call ended.");
+                  display.display();
+                  delay(2000);
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        }
+        reset_array(gsm_resp);
+      } else {
+        strncat(gsm_resp, &c, 1);
+      }
+    }
   }
 }
 
@@ -125,6 +199,10 @@ char getKeyPress() {
 }
 
 void display_menu() {
+  if(gsm_operator == "") {
+    get_gsm_operator();
+  }
+  display.drawString(0, 0, gsm_operator);
   display.drawString(0, 10, "1. Call");
   display.drawString(0, 20, "2. View SMS");
   display.drawString(0, 30, "3. UPI QR");
@@ -147,7 +225,7 @@ void display_menu() {
     display.clear();
     settings_menu();
   } else {
-    Serial.println("Invalid option presses on menu.");
+    Serial.println("Invalid option pressed on menu.");
     display.drawString(0, 50, "Invalid option!");
     display.display();
     delay(1000);
@@ -175,8 +253,6 @@ int get_gsm_operator() {
   reset_array(gsm_resp);
   reset_array(gsm_operator);
   at_resp_len = send_at_command("AT+COPS?", gsm_resp);
-  Serial.print("Network operator: ");
-  Serial.println(gsm_resp);
   strcpy(gsm_operator, gsm_resp);
 
   // Parse the string to extract the operator
@@ -193,6 +269,8 @@ int get_gsm_operator() {
   if(sizeof(gsm_operator) == 0) {
     strcpy(gsm_operator, "Unknown");
   }
+  Serial.print("GSM operator: ");
+  Serial.println(gsm_operator);
   return sizeof(gsm_operator);
 }
 
@@ -213,18 +291,59 @@ void make_call() {
   display.display();
   char call_keypad_handler_ret = call_keypad_handler(call_phone_number);
   if(call_keypad_handler_ret == 'D') {
+    display.clear();
+
     Serial.print("Dialing: ");
     Serial.println(call_phone_number);
-    send_at_command("ATD+12065551234;", gsm_resp);
+    char dial_cmd[50] = {0,};
+    strcpy(dial_cmd, "ATD");
+    strcat(dial_cmd, call_phone_number);
+    strcat(dial_cmd, ";");
+    Serial.print("Dial command: ");
+    Serial.println(dial_cmd);
+    int at_resp_len = send_at_command(dial_cmd, gsm_resp);
+    Serial.print("GSM response: ");
     Serial.println(gsm_resp);
-    display.clear();
+    // Validate the GSM response
+    int dial_complete = 0;
+    if(strstr(gsm_resp, "OK") != NULL) {
+      Serial.println("Ringing..");
+      dial_complete = 1;
+    } else {
+      Serial.println("Could not make phone call..");
+      dial_complete = 0;
+    }
+
+    // Update the display
     display.drawString(0, 0, "Dialing:");
     display.drawString(0, 10, call_phone_number);
-    display.drawString(0, 20, gsm_resp);
+    if(dial_complete) {
+      display.drawString(0, 20, "Ringing..");
+    } else {
+      display.drawString(0, 20, "Error dialing..");
+      display.display();
+      delay(5000);
+      display.clear();
+      display_menu();
+    }
     display.display();
-    delay(5000);
-    display.clear();
-    display_menu();
+
+    while(1) {
+      char key = getKeyPress();
+      if(key == 'A') {
+        Serial.println("Call hang up.");
+        reset_array(call_phone_number);
+        // End the call here and check for the response. Also resend the command until OK is received.
+        at_resp_len = send_at_command("ATH", gsm_resp);
+        Serial.print("GSM response: ");
+        Serial.println(gsm_resp);
+        delay(2000);
+        display.clear();
+        display_menu();
+      } else {
+        continue;
+      }
+    }
   }
   delay(2000);
   display.clear();
@@ -344,7 +463,7 @@ void settings_menu() {
     Serial.println("Device info.");
     display.clear();
     display.drawString(0, 0, "INFO");
-    display.drawString(0, 10, "Operator: Unknown");
+    display.drawString(0, 10, "Operator: " + String(gsm_operator));
     display.drawString(0, 20, "Strength: 0.00");
     display.display();
     display.clear();
@@ -356,7 +475,7 @@ void settings_menu() {
     display.display();
     display_menu();
   } else {
-    Serial.println("Invalid option presses on settings menu.");
+    Serial.println("Invalid option pressed on settings menu.");
     display.drawString(0, 50, "Invalid option!");
     display.display();
     settings_menu();
