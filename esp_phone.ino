@@ -1,7 +1,7 @@
 /*
   * AUTHOR: @adityad0 [https://github.com/adityad0/]
-  * PAY-PHONE https://github.com/adityad0/pay-phone/
-  * LICENSE: https://github.com/adityad0/pay-phone/LICENSE.md
+  * ESP-PHONE https://github.com/adityad0/esp-phone/
+  * LICENSE: https://github.com/adityad0/esp-phone/LICENSE.md
   * A home made POS payment system and mobile phone built with the SEED XIAO ESP32-C3 with support for BLE, Wi-Fi and 4G/LTE support.
 */
 #include <Wire.h>
@@ -101,14 +101,6 @@ void setup() {
 }
 
 void loop () {
-  // Keep looking for a keypress on the keypad, then print the key to the serial terminal
-  char key = keypad.getKey();
-  if(key) {
-    Serial.println(key);
-    display.clear();
-    display.drawString(0, 0, &key);
-    display.display();
-  }
 }
 
 // Function that runs on core 0 to handle incoming calls and SMS
@@ -216,7 +208,8 @@ void display_menu() {
   } else if(key == '3') {
     Serial.println("UPI QR.");
     display.clear();
-    display_upi_qr("test@test", "1", "Test");
+    generate_upi_qr();
+    // display_upi_qr("name@bank", "1.00", "Name of the receiver");
     getKeyPress();
     display.clear();
     display_menu();
@@ -408,6 +401,63 @@ void view_sms() {
   delay(1000);
   display.clear();
   display_menu();
+}
+
+void generate_upi_qr() {
+  display.clear();
+  display.drawString(0, 0, "Generate UPI QR");
+  display.drawString(0, 10, "Enter amount: ");
+  display.drawString(0, 20, "0.00");
+  display.display();
+  char amount[10];
+  reset_array(amount);
+  while(1) {
+    char key = getKeyPress();
+    if(key == 'A') {
+      // Cancel
+      display.clear();
+      Serial.println("UPI QR amt cancelled.");
+      display_menu();
+    } else if(key == 'B') {
+      // Backspace
+      Serial.println("UPI QR amt backspace.");
+      if(strlen(amount) > 0) {
+        amount[strlen(amount) - 1] = '\0';
+        display.clear();
+        display.drawString(0, 0, "Generate UPI QR");
+        display.drawString(0, 10, "Enter amount: ");
+        display.drawString(0, 20, amount);
+        display.display();
+      }
+    } else if(key == 'C') {
+      // Clear
+      Serial.println("UPI QR amt cleared.");
+      reset_array(amount);
+      display.clear();
+      display.drawString(0, 0, "Generate UPI QR");
+      display.drawString(0, 10, "Enter amount: ");
+      display.drawString(0, 20, "00.00");
+      display.display();
+    } else if(key == 'D') {
+      // Generate QR
+      Serial.println("UPI QR amt entered, generating QR..");
+      display_upi_qr("name@bank", amount, "Receiver Name");
+      break;
+    } else if(key == '*' || key == '#') {
+      continue;
+    } else {
+      // Add the key to the amount
+      Serial.print("Amount entered: ");
+      Serial.println(amount);
+      amount[strlen(amount)] = key;
+      display.clear();
+      display.drawString(0, 0, "Generate UPI QR");
+      display.drawString(0, 10, "Enter amount: ");
+      display.drawString(0, 20, amount);
+      display.display();
+    }
+  }
+  display.display();
 }
 
 void display_upi_qr(String upi_id, String amount, String display_name) {
